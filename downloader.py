@@ -26,7 +26,6 @@ class Downloader:
         if not Path(self.links_file).is_file() or self.refetch_links:
             self.logger.info("Saving file links")
             self.save_all_file_links()
-            exit()
         with open(self.links_file, "r") as links_file:
             data = json.load(links_file)
         self.download_data(data)
