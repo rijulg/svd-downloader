@@ -9,7 +9,7 @@ from dask.diagnostics import ProgressBar
 
 class Downloader:
 
-    base_url = 'http://stimmdb.coli.uni-saarland.de'
+    base_url = 'https://stimmdb.coli.uni-saarland.de'
     max_speaker_id = 2742
     session = requests.Session()
 
@@ -35,22 +35,25 @@ class Downloader:
         for key, row in data.items():
             if row is not None:
                 gender = row["gender"]
-                classification = row["classification"]
-                for file in row["files"]:
-                    job = self.download_file(
-                        key=key,
-                        gender=gender,
-                        classification=classification,
-                        file=file
-                    )
-                    jobs += [job]
+                for session in row["sessions"]:
+                    session_id = session["session_id"]
+                    classification = session["classification"]
+                    for file in session["files"]:
+                        job = self.download_file(
+                            key=key,
+                            session_id=session_id,
+                            gender=gender,
+                            classification=classification,
+                            file=file
+                        )
+                        jobs += [job]
         self.logger.info("Downloading files")
         with ProgressBar():
             dask.compute(*jobs)
 
     @dask.delayed
-    def download_file(self, key, gender, classification, file):
-        data_path = f"{self.out_path}/{classification}/{gender}/{key}"
+    def download_file(self, key, session_id, gender, classification, file):
+        data_path = f"{self.out_path}/{classification}/{gender}/{key}/{session_id}"
         Path(data_path).mkdir(parents=True, exist_ok=True)
         file_id = file.split("=")[1]
         file_path = f"{data_path}/{file_id}.wav"
@@ -62,7 +65,7 @@ class Downloader:
         session = self.db_session()
         ids = list(range(self.max_speaker_id))
         pages = [
-            f"http://stimmdb.coli.uni-saarland.de/details.php4?SprecherID={number}"
+            f"{self.base_url}/details.php4?SprecherID={number}"
             for number in ids
         ]
         jobs = [self.extract_links_from_page(session, page) for page in pages]
@@ -81,22 +84,42 @@ class Downloader:
         data = {
             "page": url,
             "gender": gender,
+            "sessions": []
         }
         for sess in soup.findAll('table', class_="sessiondetails"):
+            session_id = self.find_session_id(sess)
             classification = self.identify_classification(sess)
-            data["classification"] = classification
+            sess_data = {
+                "session_id": session_id
+            }
+            sess_data["classification"] = classification
             if classification in valid_classifications:
-                data["files"] = self.get_file_links(sess)
-                return data
+                if classification == "pathological":
+                    sess_data["pathologies"] = self.get_pathologies(sess)
+                sess_data["files"] = self.get_file_links(sess)
             else:
-                self.logger.warn(
+                print(
                     f"Invalid classification(={classification}) found at url: {url}")
+            data["sessions"] += [sess_data]
+        return data
+
+    def find_session_id(self, sess):
+        row = sess.find("tr", class_="titleactive")
+        cell = row.find("td")
+        link = cell.find("a")
+        return link['name']
+    
+    def get_pathologies(self, sess):
+        rows = sess.find_all("tr", class_="detailsactive")
+        for row in rows:
+            cells = row.find_all("td")
+            if "pathologies" in cells[0].text.lower():
+                return cells[1].text.strip()
 
     def db_session(self):
         session = requests.Session()
-        session.post(self.base_url, data={
-                     'sb_search': 'Datenbankanfrage', 'sb_lang': 'English'})
-        session.post(self.base_url, data={'sb_sent': 'Accept'})
+        session.post(f"{self.base_url}/index.php4", data={'sb_lang': 'English'})
+        session.post(f"{self.base_url}/index.php4", data={'sb_search': 'Database request', 'sb_sent': 'Accept'})
         return session
 
     def identify_classification(self, sess):
