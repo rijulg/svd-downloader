@@ -1,3 +1,4 @@
+import re
 import dask
 import json
 import requests
@@ -25,6 +26,7 @@ class Downloader:
         if not Path(self.links_file).is_file() or self.refetch_links:
             self.logger.info("Saving file links")
             self.save_all_file_links()
+            exit()
         with open(self.links_file, "r") as links_file:
             data = json.load(links_file)
         self.download_data(data)
@@ -89,13 +91,16 @@ class Downloader:
         for sess in soup.findAll('table', class_="sessiondetails"):
             session_id = self.find_session_id(sess)
             classification = self.identify_classification(sess)
+            recording_date, age = self.find_dates(sess)
+            pathologies = self.find_pathologies(sess)
             sess_data = {
-                "session_id": session_id
+                "session_id": session_id,
+                "classification": classification,
+                "age": age,
+                "recording_date": recording_date,
+                "pathologies": pathologies,
             }
-            sess_data["classification"] = classification
             if classification in valid_classifications:
-                if classification == "pathological":
-                    sess_data["pathologies"] = self.get_pathologies(sess)
                 sess_data["files"] = self.get_file_links(sess)
             else:
                 print(
@@ -109,7 +114,16 @@ class Downloader:
         link = cell.find("a")
         return link['name']
     
-    def get_pathologies(self, sess):
+    def find_dates(self, sess):
+        rows = sess.find_all("tr", class_="detailsactive")
+        for row in rows:
+            cells = row.find_all("td")
+            if "date of recording" in cells[0].text.lower():
+                recording_date = cells[1].find("span").text
+                age = re.findall(r'\((\d*)\)', cells[1].text)[0]
+                return recording_date, age
+    
+    def find_pathologies(self, sess):
         rows = sess.find_all("tr", class_="detailsactive")
         for row in rows:
             cells = row.find_all("td")
