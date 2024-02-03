@@ -5,12 +5,12 @@ import requests
 from pathlib import Path
 from logging import Logger
 from bs4 import BeautifulSoup
-from dask.diagnostics import ProgressBar
+from dask.diagnostics.progress import ProgressBar
 
 
 class Downloader:
 
-    base_url = 'https://stimmdb.coli.uni-saarland.de'
+    base_url = "https://stimmdb.coli.uni-saarland.de"
     max_speaker_id = 2742
     session = requests.Session()
 
@@ -45,7 +45,7 @@ class Downloader:
                             session_id=session_id,
                             gender=gender,
                             classification=classification,
-                            file=file
+                            file=file,
                         )
                         jobs += [job]
         self.logger.info("Downloading files")
@@ -59,16 +59,13 @@ class Downloader:
         file_id = file.split("=")[1]
         file_path = f"{data_path}/{file_id}.wav"
         doc = requests.get(file)
-        with open(file_path, 'wb') as f:
+        with open(file_path, "wb") as f:
             f.write(doc.content)
 
     def save_all_file_links(self):
         session = self.db_session()
         ids = list(range(self.max_speaker_id))
-        pages = [
-            f"{self.base_url}/details.php4?SprecherID={number}"
-            for number in ids
-        ]
+        pages = [f"{self.base_url}/details.php4?SprecherID={number}" for number in ids]
         jobs = [self.extract_links_from_page(session, page) for page in pages]
         with ProgressBar():
             data = dict(zip(ids, dask.compute(*jobs)))
@@ -82,12 +79,8 @@ class Downloader:
         soup = BeautifulSoup(response.text, "html.parser")
         gender = self.get_gender(soup.find("div", class_="title").text)
         valid_classifications = ["healthy", "pathological"]
-        data = {
-            "page": url,
-            "gender": gender,
-            "sessions": []
-        }
-        for sess in soup.findAll('table', class_="sessiondetails"):
+        data = {"page": url, "gender": gender, "sessions": []}
+        for sess in soup.findAll("table", class_="sessiondetails"):
             session_id = self.find_session_id(sess)
             classification = self.identify_classification(sess)
             recording_date, age = self.find_dates(sess)
@@ -102,8 +95,7 @@ class Downloader:
             if classification in valid_classifications:
                 sess_data["files"] = self.get_file_links(sess)
             else:
-                print(
-                    f"Invalid classification(={classification}) found at url: {url}")
+                print(f"Invalid classification(={classification}) found at url: {url}")
             data["sessions"] += [sess_data]
         return data
 
@@ -111,17 +103,17 @@ class Downloader:
         row = sess.find("tr", class_="titleactive")
         cell = row.find("td")
         link = cell.find("a")
-        return link['name']
-    
+        return link["name"]
+
     def find_dates(self, sess):
         rows = sess.find_all("tr", class_="detailsactive")
         for row in rows:
             cells = row.find_all("td")
             if "date of recording" in cells[0].text.lower():
                 recording_date = cells[1].find("span").text
-                age = re.findall(r'\((\d*)\)', cells[1].text)[0]
+                age = re.findall(r"\((\d*)\)", cells[1].text)[0]
                 return recording_date, age
-    
+
     def find_pathologies(self, sess):
         rows = sess.find_all("tr", class_="detailsactive")
         for row in rows:
@@ -131,8 +123,11 @@ class Downloader:
 
     def db_session(self):
         session = requests.Session()
-        session.post(f"{self.base_url}/index.php4", data={'sb_lang': 'English'})
-        session.post(f"{self.base_url}/index.php4", data={'sb_search': 'Database request', 'sb_sent': 'Accept'})
+        session.post(f"{self.base_url}/index.php4", data={"sb_lang": "English"})
+        session.post(
+            f"{self.base_url}/index.php4",
+            data={"sb_search": "Database request", "sb_sent": "Accept"},
+        )
         return session
 
     def identify_classification(self, sess):

@@ -4,10 +4,11 @@ This repo allows downloading the entire Saarbruecken Voice Database.
 
 Originally based on (https://github.com/HAMMADIPRO/SVD_downloader), but in it's current form it is almost entirely modified. The changes were made primarily to allow for automatic creation of files, running most fetches in parallel and to break downloading of files and saving list of links into separate steps.
 
-## Requirements
+## Installation
 
-    - beautifulsoup4
-    - dask
+```bash
+pip install svd-downloader
+```
 
 ## Running
 

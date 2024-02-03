@@ -1,0 +1,21 @@
+services:
+  dev:
+    image: python:3.10
+    # We do not want to recreate the container or have multiple instances of it running ever
+    container_name: svd-downloader
+    volumes:
+      # Mount SSH Keys as readonly
+      # The owners for the ssh/config file should be root:$USER (this ensures both root and $USER can access it)
+      # Run the following commands on the host machine
+      #   sudo chown root$USER ~/.ssh/config
+      #   sudo chmod 644 ~/.ssh/config
+      # https://stackoverflow.com/a/63607708/1609066
+      - ~/.ssh:/root/.ssh:ro
+      # Mount gitconfig
+      - ~/.gitconfig:/root/.gitconfig:ro
+      # Mount working folder
+      - ../:/home/workspace
+    # The following commands ensure that the container stays active
+    entrypoint: bash
+    stdin_open: true
+    tty: true

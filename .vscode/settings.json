@@ -1,0 +1,9 @@
+{
+    "python.defaultInterpreterPath": "python",
+    "editor.formatOnSave": true,
+    "python.analysis.typeCheckingMode": "basic",
+    "[python]": {
+      "editor.defaultFormatter": "ms-python.black-formatter"
+    }
+  }
+  
